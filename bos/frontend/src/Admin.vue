@@ -260,7 +260,7 @@ export default {
 
       try {
         const response = await fetch(
-          "http://localhost:5000/api/admin/login",
+          "https://battle-of-snipers.onrender.com/api/admin/login",
           {
             method: "POST",
             headers: {
@@ -298,7 +298,7 @@ export default {
 
       try {
         const response = await fetch(
-          "http://localhost:5000/api/admin/registrations",
+          "https://battle-of-snipers.onrender.com/api/admin/registrations",
           {
             headers: {
               Authorization: "Bearer " + this.token
@@ -343,7 +343,7 @@ async deleteRegistration(registration) {
 
   try {
     const response = await fetch(
-      `http://localhost:5000/api/admin/registrations/${encodeURIComponent(registration._id)}`,
+      `https://battle-of-snipers.onrender.com/api/admin/registrations/${encodeURIComponent(registration._id)}`,
       {
         method: "DELETE",
         headers: {
