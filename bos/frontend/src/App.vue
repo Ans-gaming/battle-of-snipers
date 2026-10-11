@@ -83,8 +83,8 @@
           <small>PNG, JPG or WEBP</small>
         </div>
 
-        <button type="submit" class="register-btn">
-          REGISTER NOW
+        <button type="submit" class="register-btn" :disabled="isSubmitting">
+          {{ isSubmitting ? "SUBMITTING... PLEASE WAIT" : "REGISTER NOW" }}
         </button>
       </form>
 
@@ -119,6 +119,7 @@ export default {
   data() {
     return {
       showAdmin: false,
+      isSubmitting: false,
 
       form: {
         ffUid: "",
@@ -137,6 +138,11 @@ export default {
 
     
 async register() {
+  // Prevent repeated clicks while the current registration request is in progress.
+  if (this.isSubmitting) return;
+
+  this.isSubmitting = true;
+
   try {
     if (!(this.form.teamLogo instanceof File)) {
       alert("Please select your team logo.");
@@ -202,6 +208,8 @@ async register() {
   } catch (error) {
     console.error("Registration error:", error);
     alert(error.message || "Unable to submit registration.");
+  } finally {
+    this.isSubmitting = false;
   }
 }
   }
@@ -320,6 +328,12 @@ small {
   font-size: 16px;
   font-weight: 800;
   cursor: pointer;
+}
+
+.register-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .register-btn:hover {
