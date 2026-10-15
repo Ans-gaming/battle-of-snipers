@@ -6,8 +6,31 @@
     @close="showAdmin = false"
   />
 
-  <!-- Existing registration page -->
-  <div v-else class="page">
+  <!-- Public pages -->
+  <template v-else>
+    <!-- Admin button -->
+    <button
+      class="admin-btn"
+      type="button"
+      title="Admin Login"
+      aria-label="Open admin login"
+      @click="showAdmin = true"
+    >
+      ⚙
+    </button>
+
+    <!-- Loading page -->
+    <div v-if="modeLoading" class="status-page">
+      <h2>Loading Tournament...</h2>
+    </div>
+
+    <!-- Live standings -->
+    <LiveStandings
+      v-else-if="tournamentStarted"
+    />
+
+    <!-- Registration page -->
+    <div v-else-if="registrationOpen" class="page">
     <div class="register-card">
       <div class="header">
         <h1>BATTLE OF SNIPERS</h1>
@@ -92,34 +115,38 @@
         <p>After registration, join our official WhatsApp group.</p>
       </div>
     </div>
-
-    <!-- Admin icon -->
-    <button
-      class="admin-btn"
-      type="button"
-      title="Admin Login"
-      aria-label="Open admin login"
-      @click="showAdmin = true"
-    >
-      ⚙
-    </button>
   </div>
+
+<!-- Tournament not started page -->
+<div v-else class="status-page">
+  <h1>BATTLE OF SNIPERS</h1>
+  <h2>SEASON 7</h2>
+  <p class="status-title">TOURNAMENT NOT YET STARTED</p>
+  <p>Stay tuned for official tournament updates.</p>
+</div>
+</template>
 </template>
 
 <script>
 import Admin from "./Admin.vue";
+import LiveStandings from "./LiveStandings.vue";
 
 export default {
   name: "App",
 
-  components: {
-    Admin
-  },
+ components: {
+  Admin,
+  LiveStandings
+},
 
   data() {
     return {
       showAdmin: false,
       isSubmitting: false,
+      registrationOpen: true,
+tournamentStarted: false,
+modeLoading: true,
+modeInterval: null,
 
       form: {
         ffUid: "",
@@ -131,7 +158,46 @@ export default {
     };
   },
 
+  
+mounted() {
+  this.loadTournamentMode();
+
+  // Check for admin setting changes every 5 seconds
+  this.modeInterval = setInterval(() => {
+    this.loadTournamentMode();
+  }, 5000);
+},
+
+beforeUnmount() {
+  if (this.modeInterval) {
+    clearInterval(this.modeInterval);
+  }
+},
+
   methods: {
+    
+async loadTournamentMode() {
+  try {
+    const response = await fetch(
+      "http://localhost:5000/api/tournament-mode",
+      { cache: "no-store" }
+    );
+
+    if (!response.ok) {
+      throw new Error("Could not load tournament settings.");
+    }
+
+    const settings = await response.json();
+
+    this.registrationOpen = settings.registrationOpen;
+    this.tournamentStarted = settings.tournamentStarted;
+  } catch (error) {
+    console.error("Tournament mode error:", error);
+  } finally {
+    this.modeLoading = false;
+  }
+},
+
     handleLogo(event) {
       this.form.teamLogo = event.target.files[0] || null;
     },
@@ -158,7 +224,7 @@ async register() {
     formData.append("teamLogo", this.form.teamLogo);
 
     const response = await fetch(
-      "https://battle-of-snipers.onrender.com/api/register",
+      "http://localhost:5000/api/register",
       {
         method: "POST",
         body: formData
@@ -359,13 +425,12 @@ small {
   color: #888;
   cursor: pointer;
   font-size: 18px;
+  z-index: 1000;
 }
-
 .admin-btn:hover {
   color: #ffb000;
   border-color: #ffb000;
 }
-
 
 /* Responsive layout improvements */
 .page {
@@ -483,6 +548,36 @@ small {
   .form-group input {
     padding: 11px 9px;
   }
+}
+
+
+.status-page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 30px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background: #0b0b0f;
+  color: #fff;
+}
+
+.status-page h1 {
+  color: #ffb000;
+  font-size: clamp(24px, 6vw, 36px);
+}
+
+.status-page h2 {
+  margin-top: 0;
+}
+
+.status-title {
+  margin-top: 25px;
+  font-size: 20px;
+  font-weight: bold;
+  color: #ffb000;
 }
 
 </style>
