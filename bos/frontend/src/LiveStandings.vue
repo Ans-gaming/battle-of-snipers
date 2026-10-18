@@ -34,6 +34,45 @@
         <p><strong>Team:</strong> {{ teamName }}</p>
       </div>
       
+      <div class="scheduled-matches-section">
+  <h2>Scheduled Matches</h2>
+
+  <p v-if="scheduledMatchesLoading">
+    Loading scheduled matches...
+  </p>
+
+  <p v-else-if="scheduledMatchesError" class="error-message">
+    {{ scheduledMatchesError }}
+  </p>
+
+  <p v-else-if="scheduledMatches.length === 0">
+    No scheduled matches available yet.
+  </p>
+
+  <div v-else class="scheduled-matches-list">
+    <div
+      v-for="match in scheduledMatches"
+      :key="match._id"
+      class="scheduled-match-card"
+    >
+      <div class="scheduled-match-header">
+        <span>Group {{ match.group }}</span>
+        <span>{{ new Date(match.matchDate).toLocaleString() }}</span>
+      </div>
+
+      <div class="scheduled-match-teams">
+        <strong>{{ match.team1Name }}</strong>
+        <span>VS</span>
+        <strong>{{ match.team2Name }}</strong>
+      </div>
+
+      <p class="scheduled-match-assigned">
+        Assigned to: {{ match.assignedTo }}
+      </p>
+    </div>
+  </div>
+</div>
+
       <div class="results-placeholder">
         <h3>TOURNAMENT TEAMS</h3>
         <p v-if="groupsLoading">Loading teams...</p>
@@ -156,7 +195,10 @@ export default {
       },
       pointsLoading: false,
       pointsError: "",
-      pointsInterval: null
+      pointsInterval: null,
+      scheduledMatches: [],
+      scheduledMatchesLoading: false,
+      scheduledMatchesError: ""
     };
   },
 
@@ -226,6 +268,43 @@ export default {
       }
     },
 
+    
+async loadScheduledMatches() {
+  this.scheduledMatchesLoading = true;
+  this.scheduledMatchesError = "";
+
+  try {
+    const response = await fetch(
+      "https://battle-of-snipers.onrender.com/api/scheduled-matches/for-player",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          ffUid: this.verifiedUid
+        }),
+        cache: "no-store"
+      }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        result.message || "Could not load scheduled matches."
+      );
+    }
+
+    this.scheduledMatches = result.scheduledMatches || [];
+  } catch (error) {
+    this.scheduledMatchesError =
+      error.message || "Unable to load scheduled matches.";
+  } finally {
+    this.scheduledMatchesLoading = false;
+  }
+},
+
     async verifyUid() {
       if (this.loading) return;
 
@@ -261,6 +340,7 @@ export default {
         this.verified = true;
         this.loadGroups();
         this.loadPointsTable();
+        this.loadScheduledMatches();
         
         if (this.pointsInterval) {
           clearInterval(this.pointsInterval);
@@ -290,6 +370,9 @@ export default {
       this.verifiedUid = "";
       this.playerName = "";
       this.teamName = "";
+      this.scheduledMatches = [];
+      this.scheduledMatchesLoading = false;
+      this.scheduledMatchesError = "";
       if (this.pointsInterval) {
         clearInterval(this.pointsInterval);
         this.pointsInterval = null;
@@ -578,6 +661,79 @@ export default {
   color: #ef4444;
   background: rgba(239, 68, 68, 0.14);
   border: 1px solid rgba(239, 68, 68, 0.45);
+}
+
+
+.scheduled-matches-section {
+  margin-top: 28px;
+  padding: 20px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.scheduled-matches-section h2 {
+  margin: 0 0 18px;
+  color: #ffcc00;
+  font-size: 22px;
+}
+
+.scheduled-matches-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
+}
+
+.scheduled-match-card {
+  padding: 16px;
+  border-radius: 12px;
+  background: rgba(15, 20, 32, 0.8);
+  border: 1px solid rgba(255, 204, 0, 0.3);
+}
+
+.scheduled-match-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: #ffcc00;
+  font-size: 13px;
+}
+
+.scheduled-match-teams {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin: 22px 0;
+  color: #ffffff;
+}
+
+.scheduled-match-teams span {
+  color: #ff5252;
+  font-weight: 800;
+}
+
+.scheduled-match-assigned {
+  margin: 0;
+  color: #b8c0ce;
+  font-size: 13px;
+}
+
+.scheduled-matches-section p {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 480px) {
+  .scheduled-matches-section {
+    padding: 14px;
+  }
+
+  .scheduled-match-teams {
+    gap: 6px;
+    font-size: 13px;
+  }
 }
 
 </style>

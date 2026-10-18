@@ -11,8 +11,8 @@
           <p>SEASON 7 · ADMIN PANEL</p>
         </div>
       </div>
-
-      <button class="back-btn" @click="$emit('close')"> ← Back to Registration </button>
+      
+      <button class="back-btn" @click="$emit('close')"> ← {{ backButtonLabel }} </button>
     </header>
 
     <!-- ADMIN LOGIN -->
@@ -44,8 +44,7 @@
       <div class="dashboard-heading">
         <div>
           <p class="eyebrow">TOURNAMENT MANAGEMENT</p>
-          <h1>Registration Dashboard</h1>
-          <p class="subtitle"> View registered teams and their submitted details. </p>
+          <h1>Admin Dashboard</h1>
         </div>
 
         <div class="header-actions">
@@ -58,13 +57,11 @@
         <section class="stat-card">
           <span class="stat-label">TOTAL REGISTERED TEAMS</span>
           <strong> {{ registrations.length }} </strong>
-          <span class="stat-caption">All saved registrations</span>
         </section>
 
         <section class="stat-card">
           <span class="stat-label">TEAM LOGOS</span>
           <strong> {{ logoCount }} </strong>
-          <span class="stat-caption">Uploaded logo images</span>
         </section>
       </div>
       
@@ -72,7 +69,6 @@
         <div class="table-heading">
           <div>
             <h2>Tournament Mode</h2>
-            <p>Control what players see on the public page.</p>
           </div>
           <button class="secondary-btn" type="button" @click="loadTournamentMode" :disabled="savingSettings"> Refresh Mode </button>
         </div>
@@ -80,162 +76,208 @@
         <p v-if="settingsError" class="error-message"> {{ settingsError }} </p>
         <p v-if="settingsMessage" class="settings-message"> {{ settingsMessage }} </p>
         
-        <div class="mode-row">
+        <div class="mode-options">
+          <div class="mode-row">
+            <div>
+              <h3>Registration Open</h3>
+              <p>Allow new players to register.</p>
+            </div>
+            <button type="button" class="mode-btn" :class="{ active: registrationOpen }" :disabled="savingSettings || settingsLoading" @click="setTournamentMode('registration')"> {{ registrationOpen ? "ON" : "OFF" }} </button>
+          </div>
+          
+          <div class="mode-row">
+            <div>
+              <h3>Tournament Started</h3>
+              <p>Show the live tournament page.</p>
+            </div>
+            <button type="button" class="mode-btn" :class="{ active: tournamentStarted }" :disabled="savingSettings || settingsLoading" @click="setTournamentMode('started')"> {{ tournamentStarted ? "ON" : "OFF" }} </button>
+          </div>
+        </div>
+      </section>
+      
+      <section v-if="!registrationOpen && !tournamentStarted" class="table-card match-settings-card">
+        <div class="table-heading match-settings-heading">
+          <h2>Match Settings</h2>
+          <button class="primary-btn" type="button" :disabled="savingSettings || settingsLoading" @click="saveMatchSettings"> {{ savingSettings ? "SAVING..." : "SAVE MATCH SETTINGS" }} </button>
+        </div>
+        
+        <div class="match-settings-grid">
+          <div class="match-setting-item">
+            <h3>Matches Per Team</h3>
+            <select v-model.number="matchesPerTeam" :disabled="savingSettings || settingsLoading || groupATeamCount < 2 || groupATeamCount !== groupBTeamCount">
+              <option :value="null">Select matches</option>
+              <option v-for="count in groupAMatchOptions" :key="count" :value="count"> {{ count }} matches per team </option>
+            </select>
+          </div>
+          
+          <div class="match-setting-item">
+            <h3>Qualifiers Per Group</h3>
+            <select v-model.number="qualifiersPerGroup" :disabled="savingSettings || settingsLoading || qualifierOptions.length === 0">
+              <option :value="null">Select qualifiers</option>
+              <option v-for="count in qualifierOptions" :key="count" :value="count"> Top {{ count }} teams </option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCHEDULE MATCHES CARD -->
+      <section v-if="!registrationOpen && !tournamentStarted" class="table-card schedule-matches-card">
+        <div class="table-heading">
           <div>
-            <h3>Registration Open</h3>
-      <p>Allow new players to register.</p>
-    </div>
-    <button
-      type="button"
-      class="mode-btn"
-      :class="{ active: registrationOpen }"
-      :disabled="savingSettings || settingsLoading"
-      @click="setTournamentMode('registration')"
-    >
-      {{ registrationOpen ? "ON" : "OFF" }}
-    </button>
+            <h2>Schedule Matches</h2>
+            <p>Assign teams, match date, time and match coordinator.</p>
+          </div>
+        </div>
+
+        <form class="schedule-match-form" @submit.prevent="scheduleMatch">
+          <div class="schedule-group-assigned-row">
+            <div>
+              <label for="scheduleGroup">Select Group</label>
+              <select id="scheduleGroup" v-model="scheduleGroup" @change="resetScheduleTeams" required>
+                <option value="A">Group A</option>
+                <option value="B">Group B</option>
+              </select>
+            </div>
+            
+            <div>
+              <label for="scheduleAssignedTo">Assigned To</label>
+              <input id="scheduleAssignedTo" v-model.trim="scheduleAssignedTo" type="text" placeholder="Enter admin/person name" required/>
+            </div>
+          </div>
+          <div class="schedule-team-row">
+            <div>
+              <label for="scheduleTeam1">Team 1</label>
+              <select id="scheduleTeam1" v-model="scheduleTeam1" required>
+                <option value="" disabled>Select team</option>
+                <option v-for="team in scheduleGroupTeams" :key="team._id" :value="team._id"> {{ team.teamName }} </option>
+              </select>
+            </div>
+            <span class="schedule-vs">VS</span>
+            <div>
+              <label for="scheduleTeam2">Team 2</label>
+              <select id="scheduleTeam2" v-model="scheduleTeam2" required>
+                <option value="" disabled>Select team</option>
+                <option v-for="team in scheduleGroupTeams" :key="team._id" :value="team._id" :disabled="team._id === scheduleTeam1"> {{ team.teamName }} </option>
+              </select>
+            </div>
+          </div>
+
+          
+<div class="schedule-date-time-row">
+  <div class="schedule-date-field">
+    <label for="scheduleDate">Match Date</label>
+    <input id="scheduleDate" v-model="scheduleDate" type="date" required />
   </div>
 
-  <div class="mode-row">
-    <div>
-      <h3>Tournament Started</h3>
-      <p>Show the live tournament page.</p>
-    </div>
-    <button
-      type="button"
-      class="mode-btn"
-      :class="{ active: tournamentStarted }"
-      :disabled="savingSettings || settingsLoading"
-      @click="setTournamentMode('started')"
-    >
-      {{ tournamentStarted ? "ON" : "OFF" }}
-    </button>
+  <div class="schedule-time-field">
+    <label for="scheduleTime">Match Time</label>
+    <input id="scheduleTime" v-model="scheduleTime" type="time" required />
   </div>
 
-  <p class="mode-status">
-    Public page:
-    <strong>{{ publicModeLabel }}</strong>
-  </p>
-  
-
-<div
-  v-if="!registrationOpen && !tournamentStarted"
-  class="mode-row"
->
-  <div>
-    <h3>Matches Per Team</h3>
-    <p>
-      {{ groupATeamCount }} teams in Group A and
-      {{ groupBTeamCount }} teams in Group B.
-      Select one round or two rounds.
-    </p>
-  </div>
-
-  <select
-    v-model.number="matchesPerTeam"
-    :disabled="
-      savingSettings ||
-      settingsLoading ||
-      groupATeamCount < 2 ||
-      groupATeamCount !== groupBTeamCount
-    "
+  <button
+    type="button"
+    class="edit-scheduled-matches-btn"
+    @click="showScheduledMatches = true; loadScheduledMatches()"
   >
-    <option :value="null">Select matches</option>
-
-    <option
-      v-for="count in groupAMatchOptions"
-      :key="count"
-      :value="count"
-    >
-      {{ count }} matches per team
-    </option>
-  </select>
+    EDIT SCHEDULED MATCHES
+  </button>
 </div>
 
+          
+          <div v-if="showScheduledMatches" class="scheduled-matches-overlay" @click.self="showScheduledMatches = false">
+            <section class="scheduled-matches-panel" role="dialog" aria-modal="true" aria-labelledby="scheduledMatchesTitle">
+              <div class="scheduled-matches-panel-header">
+                <div class="scheduled-matches-title">
+                  <span class="scheduled-matches-eyebrow">TOURNAMENT CONTROL</span>
+                  <h3 id="scheduledMatchesTitle">Manage Scheduled Matches</h3>
+                  <p>View, filter and update your scheduled fixtures.</p>
+                </div>
+                <button type="button" class="close-scheduled-matches-btn" @click="showScheduledMatches = false"> CLOSE </button>
+              </div>
+            
+              <div class="scheduled-match-filters">
+                <button type="button" :class="{ active: scheduledMatchFilter === 'all' }" @click="scheduledMatchFilter = 'all'"> ALL MATCHES </button>
+                <button type="button" :class="{ active: scheduledMatchFilter === 'upcoming' }" @click="scheduledMatchFilter = 'upcoming'"> UPCOMING </button>
+                <button type="button" :class="{ active: scheduledMatchFilter === 'completed' }" @click="scheduledMatchFilter = 'completed'"> COMPLETED </button>
+              </div>
+              
+              <div v-if="filteredScheduledMatches.length === 0" class="scheduled-match-empty">
+                No scheduled matches found.
+              </div>
+              
+              <div v-else class="scheduled-match-list">
+                <div v-for="match in filteredScheduledMatches" :key="match._id" class="scheduled-match-item">
+                  <h4>{{ match.team1Name }} vs {{ match.team2Name }}</h4>
+                  <p>Group: {{ match.group }}</p>
+                  <p>Assigned To: {{ match.assignedTo }}</p>
+                  <p>Match Date: {{ new Date(match.matchDate).toLocaleString() }}</p>
+                  <div class="scheduled-match-actions">
+                    <button v-if="new Date(match.matchDate).getTime() > Date.now()" type="button" class="edit-match-btn" @click="editScheduledMatch(match)"> EDIT </button>
+                    <button type="button" class="delete-match-btn" @click="deleteScheduledMatch(match)"> DELETE </button>
+                  </div>
+                </div>
+              </div>
 
-<div v-if="!registrationOpen && !tournamentStarted" class="mode-row">
-  <div>
-    <h3>Qualifiers Per Group</h3>
-    <p>
-      Select how many top teams from each group will qualify.
-    </p>
-  </div>
-
-  <select
-    v-model.number="qualifiersPerGroup"
-    :disabled="
-      savingSettings ||
-      settingsLoading ||
-      qualifierOptions.length === 0
-    "
-  >
-    <option :value="null">Select qualifiers</option>
-
-    <option
-      v-for="count in qualifierOptions"
-      :key="count"
-      :value="count"
-    >
-      Top {{ count }} teams
-    </option>
-  </select>
-</div>
-
-<button v-if="!registrationOpen && !tournamentStarted"
-  class="primary-btn"
-  type="button"
-  :disabled="savingSettings || settingsLoading"
-  @click="saveMatchSettings"
->
-  {{ savingSettings ? "SAVING..." : "SAVE MATCH SETTINGS" }}
-</button>
-
-</section>
-
-
-<div class="match-panels">
-<section
-  v-if="!registrationOpen && tournamentStarted"
-  class="table-card match-entry-card"
->
-  <div class="table-heading">
-    <div>
-      <h2>Match Entry</h2>
-      <p>Record a match result for Group A or Group B.</p>
-    </div>
-  </div>
-
-  <p v-if="matchError" class="error-message">
-    {{ matchError }}
-  </p>
-
-  <p v-if="matchMessage" class="settings-message">
-    {{ matchMessage }}
-  </p>
-
-  <form class="match-form" @submit.prevent="saveMatch">
-    <label for="matchGroup">Select Group</label>
-    <select
-      id="matchGroup"
-      v-model="matchGroup"
-      @change="resetMatchSelection"
-      required
-    >
-      <option value="A">Group A</option>
-      <option value="B">Group B</option>
-    </select>
-
-    <label for="winnerId">Winner Team</label>
-    <select id="winnerId" v-model="winnerId" required>
-      <option value="" disabled>Select winner</option>
-      <option
-        v-for="team in matchGroupTeams"
-        :key="team._id"
-        :value="team._id"
-      >
-        {{ team.teamName }}
-      </option>
-    </select>
+              <div v-if="editingScheduledMatchId" class="edit-scheduled-match-form">
+                <h3>Edit Scheduled Match</h3>
+                <label for="editScheduleGroup">Group</label>
+                <select id="editScheduleGroup" v-model="editScheduleGroup" @change="editScheduleTeam1 = ''; editScheduleTeam2 = ''" required>
+                  <option value="A">Group A</option>
+                  <option value="B">Group B</option>
+                </select>
+            
+                <label for="editScheduleTeam1">Team 1</label>
+                <select id="editScheduleTeam1" v-model="editScheduleTeam1" required>
+                  <option v-for="team in editScheduleGroupTeams" :key="team._id" :value="team._id"> {{ team.teamName }} </option>
+                </select>
+                
+                <label for="editScheduleTeam2">Team 2</label>
+                <select id="editScheduleTeam2" v-model="editScheduleTeam2" required>
+                  <option v-for="team in editScheduleGroupTeams" :key="team._id" :value="team._id"> {{ team.teamName }} </option>
+                </select>
+                
+                <label for="editScheduleAssignedTo">Assigned To</label>
+                <input id="editScheduleAssignedTo" v-model.trim="editScheduleAssignedTo" type="text" placeholder="Enter admin/person name" required/>
+                <label for="editScheduleDate">Match Date</label>
+                <input id="editScheduleDate" v-model="editScheduleDate" type="date" required/>
+                <label for="editScheduleTime">Match Time</label>
+                <input id="editScheduleTime" v-model="editScheduleTime" type="time" required/>
+                <button type="button" class="cancel-edit-match-btn" @click="editingScheduledMatchId = ''"> CANCEL EDIT </button>
+                <button type="button" class="primary-btn" @click="saveScheduledMatchEdits"> SAVE CHANGES </button>
+              </div>
+            </section>
+          </div>
+       
+          <p v-if="scheduleError" class="error-message"> {{ scheduleError }} </p>
+          <p v-if="scheduleMessage" class="settings-message"> {{ scheduleMessage }} </p>
+          <button class="primary-btn" type="submit"> SCHEDULE MATCH </button>
+        </form>
+      </section>
+      
+      <div class="match-panels">
+        <section v-if="!registrationOpen && tournamentStarted" class="table-card match-entry-card">
+          <div class="table-heading">
+            <div>
+              <h2>Match Entry</h2>
+              <p>Record a match result for Group A or Group B.</p>
+            </div>
+          </div>
+          
+          <p v-if="matchError" class="error-message"> {{ matchError }} </p>
+          <p v-if="matchMessage" class="settings-message"> {{ matchMessage }} </p>
+          
+          <form class="match-form" @submit.prevent="saveMatch">
+            <label for="matchGroup">Select Group</label>
+            <select id="matchGroup" v-model="matchGroup" @change="resetMatchSelection" required>
+              <option value="A">Group A</option>
+              <option value="B">Group B</option>
+            </select>
+            
+            <label for="winnerId">Winner Team</label>
+            <select id="winnerId" v-model="winnerId" required>
+              <option value="" disabled>Select winner</option>
+              <option v-for="team in matchGroupTeams" :key="team._id" :value="team._id"> {{ team.teamName }} </option>
+            </select>
 
     <label for="loserId">Loser Team</label>
     <select id="loserId" v-model="loserId" required>
@@ -269,15 +311,6 @@
       :disabled="matchSaving || matchGroupTeams.length < 2"
     >
       {{ matchSaving ? "SAVING MATCH..." : "SAVE MATCH RESULT" }}
-    </button>
-
-    <button
-      class="undo-match-btn"
-      type="button"
-      :disabled="matchSaving || undoingMatch"
-      @click="undoLastMatch"
-    >
-      {{ undoingMatch ? "UNDOING..." : "UNDO LAST MATCH" }}
     </button>
   </form>
 
@@ -328,6 +361,15 @@
     <button class="primary-btn" type="submit" :disabled="tieSaving">
       {{ tieSaving ? "SAVING..." : "SAVE TIE BREAKER" }}
     </button>
+
+      <button
+      class="undo-match-btn"
+      type="button"
+      :disabled="matchSaving || undoingMatch"
+      @click="undoLastMatch"
+    >
+      {{ undoingMatch ? "UNDOING..." : "UNDO LAST MATCH" }}
+    </button>
   </form>
 </section>
 </div>
@@ -335,7 +377,6 @@
         <div class="table-heading">
           <div>
             <h2>Registered Teams</h2>
-            <p>Latest registrations appear first.</p>
           </div>
 
           <input
@@ -508,7 +549,28 @@ export default {
       tieTeam2: "",
       tieSaving: false,
       tieError: "",
-      tieMessage: ""
+      tieMessage: "",
+      scheduleGroup: "A",
+      scheduleTeam1: "",
+      scheduleTeam2: "",
+      scheduleDate: "",
+      scheduleTime: "",
+      scheduleAssignedTo: "",
+      scheduleError: "",
+      scheduleMessage: "",
+      scheduleSaving: false,
+      showScheduledMatches: false,
+      scheduledMatchFilter: "all",
+      scheduledMatches: [],
+      currentTime: Date.now(),
+      scheduledMatchesTimer: null,
+      editingScheduledMatchId: "",
+      editScheduleDate: "",
+      editScheduleTime: "",
+      editScheduleGroup: "A",
+      editScheduleTeam1: "",
+      editScheduleTeam2: "",
+      editScheduleAssignedTo: ""
     };
   },
 
@@ -546,6 +608,18 @@ export default {
       }
       return "Tournament Not Yet Started";
     },
+    
+    backButtonLabel() {
+      if (this.registrationOpen) {
+        return "Back to Registration";
+      }
+      
+      if (this.tournamentStarted) {
+        return "Back to Tournament";
+      }
+      
+      return "Back";
+    },
 
     matchGroupTeams() {
       return this.registrations.filter(
@@ -556,6 +630,18 @@ export default {
     tieGroupTeams() {
   return this.registrations.filter(
     registration => registration.group === this.tieGroup
+  );
+},
+
+scheduleGroupTeams() {
+  return this.registrations.filter(
+    registration => registration.group === this.scheduleGroup
+  );
+},
+
+editScheduleGroupTeams() {
+  return this.registrations.filter(
+    registration => registration.group === this.editScheduleGroup
   );
 },
 
@@ -584,6 +670,7 @@ groupBMatchOptions() {
 
   return [teams - 1, 2 * (teams - 1)];
 },
+
 qualifierOptions() {
   if (
     this.groupATeamCount < 1 ||
@@ -596,10 +683,313 @@ qualifierOptions() {
     { length: this.groupATeamCount },
     (_, index) => index + 1
   );
-}
+}, 
+    filteredScheduledMatches() {
+      const now = this.currentTime;
+
+      if (this.scheduledMatchFilter === "upcoming") {
+        return this.scheduledMatches.filter(
+          match => new Date(match.matchDate).getTime() > now
+        );
+      }
+
+      if (this.scheduledMatchFilter === "completed") {
+        return this.scheduledMatches.filter(
+          match => new Date(match.matchDate).getTime() <= now
+        );
+      }
+
+      return this.scheduledMatches;
+    }
   },
 
+  mounted() {
+  this.scheduledMatchesTimer = setInterval(() => {
+    this.currentTime = Date.now();
+  }, 1000);
+},
+
+beforeUnmount() {
+  clearInterval(this.scheduledMatchesTimer);
+},
+
   methods: {
+    resetScheduleTeams() {
+      this.scheduleTeam1 = "";
+      this.scheduleTeam2 = "";
+    },
+    
+    editScheduledMatch(match) {
+  if (new Date(match.matchDate).getTime() <= this.currentTime) {
+    alert("Completed matches cannot be edited.");
+    return;
+  }
+
+  const matchDate = new Date(match.matchDate);
+
+  this.editingScheduledMatchId = match._id;
+  this.editScheduleGroup = match.group;
+  this.editScheduleTeam1 = match.team1Id;
+  this.editScheduleTeam2 = match.team2Id;
+  this.editScheduleAssignedTo = match.assignedTo || "";
+  this.editScheduleDate = [
+    matchDate.getFullYear(),
+    String(matchDate.getMonth() + 1).padStart(2, "0"),
+    String(matchDate.getDate()).padStart(2, "0")
+  ].join("-");
+
+  this.editScheduleTime = [
+    String(matchDate.getHours()).padStart(2, "0"),
+    String(matchDate.getMinutes()).padStart(2, "0")
+  ].join(":");
+},
+
+async saveScheduledMatchEdits() {
+  if (!this.editingScheduledMatchId) {
+    alert("Please select a match to edit.");
+    return;
+  }
+
+  if (
+    !this.editScheduleTeam1 ||
+    !this.editScheduleTeam2 ||
+    this.editScheduleTeam1 === this.editScheduleTeam2
+  ) {
+    alert("Please select two different teams.");
+    return;
+  }
+
+  if (!this.editScheduleDate || !this.editScheduleTime) {
+    alert("Please select the match date and time.");
+    return;
+  }
+
+  if (!this.editScheduleAssignedTo.trim()) {
+    alert("Please enter the assigned person's name.");
+    return;
+  }
+
+  const matchDateTime = new Date(
+    `${this.editScheduleDate}T${this.editScheduleTime}`
+  );
+
+  if (
+    Number.isNaN(matchDateTime.getTime()) ||
+    matchDateTime.getTime() <= Date.now()
+  ) {
+    alert("Please select a future date and time.");
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      `https://battle-of-snipers.onrender.com/api/admin/scheduled-matches/${this.editingScheduledMatchId}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + this.token
+        },
+        body: JSON.stringify({
+          group: this.editScheduleGroup,
+          team1Id: this.editScheduleTeam1,
+          team2Id: this.editScheduleTeam2,
+          matchDate: matchDateTime.toISOString(),
+          assignedTo: this.editScheduleAssignedTo.trim()
+        })
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      alert(data.message || "Could not update the scheduled match.");
+      return;
+    }
+
+    alert("Scheduled match updated successfully.");
+
+    this.editingScheduledMatchId = "";
+    this.editScheduleDate = "";
+    this.editScheduleTime = "";
+    this.editScheduleGroup = "A";
+    this.editScheduleTeam1 = "";
+    this.editScheduleTeam2 = "";
+    this.editScheduleAssignedTo = "";
+
+    await this.loadScheduledMatches();
+  } catch (error) {
+    console.error("Updating scheduled match failed:", error);
+    alert("Could not update the scheduled match. Please try again.");
+  }
+},
+
+async deleteScheduledMatch(match) {
+  const confirmed = window.confirm(
+    `Are you sure you want to delete "${match.team1Name} vs ${match.team2Name}"?\n\nThis action cannot be undone.`
+  );
+
+  if (!confirmed) return;
+
+  try {
+    const response = await fetch(
+      `https://battle-of-snipers.onrender.com/api/admin/scheduled-matches/${match._id}`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: "Bearer " + this.token
+        }
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      alert(data.message || "Could not delete the match.");
+      return;
+    }
+
+    // Close edit form if the deleted match was being edited
+    if (this.editingScheduledMatchId === match._id) {
+      this.editingScheduledMatchId = "";
+    }
+
+    alert("Match deleted successfully.");
+
+    // Reload matches from the database
+    await this.loadScheduledMatches();
+  } catch (error) {
+    console.error("Deleting scheduled match failed:", error);
+    alert("Could not delete the match. Please try again.");
+  }
+},
+
+    async loadScheduledMatches() {
+  try {
+    const response = await fetch(
+      "https://battle-of-snipers.onrender.com/api/admin/scheduled-matches",
+      {
+        method: "GET",
+        headers: {
+          Authorization: "Bearer " + this.token
+        },
+        cache: "no-store"
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      alert(data.message || "Could not load scheduled matches.");
+      return;
+    }
+
+    this.scheduledMatches = data.scheduledMatches || [];
+  } catch (error) {
+    console.error("Loading scheduled matches failed:", error);
+    alert("Could not load scheduled matches. Please try again.");
+  }
+},
+
+    async scheduleMatch() {
+      this.scheduleError = "";
+      this.scheduleMessage = "";
+      
+      if (this.scheduleSaving) return;
+      if (!this.scheduleTeam1 || !this.scheduleTeam2) {
+        this.scheduleError = "Please select both teams.";
+        return;
+      }
+      
+      if (this.scheduleTeam1 === this.scheduleTeam2) {
+        this.scheduleError = "Team 1 and Team 2 must be different.";
+        return;
+      }
+      
+      const team1 = this.scheduleGroupTeams.find(
+        team => team._id === this.scheduleTeam1
+      );
+      
+      const team2 = this.scheduleGroupTeams.find(
+        team => team._id === this.scheduleTeam2
+      );
+      
+      if (!team1 || !team2) {
+        this.scheduleError =  "Selected teams are invalid. Please select them again.";
+        return;
+      }
+
+  if (!this.scheduleDate || !this.scheduleTime) {
+    this.scheduleError = "Please select the match date and time.";
+    return;
+  }
+
+  const matchDateTime = new Date(
+    `${this.scheduleDate}T${this.scheduleTime}`
+  );
+
+  if (
+    Number.isNaN(matchDateTime.getTime()) ||
+    matchDateTime <= new Date()
+  ) {
+    this.scheduleError = "Please select a future date and time.";
+    return;
+  }
+
+  if (!this.scheduleAssignedTo.trim()) {
+    this.scheduleError = "Please enter the assigned person's name.";
+    return;
+  }
+
+  
+this.scheduleSaving = true;
+
+try {
+  const response = await fetch(
+    "https://battle-of-snipers.onrender.com/api/admin/scheduled-matches",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + this.token
+      },
+      body: JSON.stringify({
+        group: this.scheduleGroup,
+        team1Id: team1._id,
+        team2Id: team2._id,
+        matchDate: matchDateTime.toISOString(),
+        assignedTo: this.scheduleAssignedTo.trim()
+      })
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data.message || "Could not schedule the match."
+    );
+  }
+
+  this.scheduleMessage =
+    data.message || "Match scheduled successfully.";
+
+  // Reset the form after a successful save.
+  this.scheduleTeam1 = "";
+  this.scheduleTeam2 = "";
+  this.scheduleDate = "";
+  this.scheduleTime = "";
+  this.scheduleAssignedTo = "";
+
+} catch (error) {
+  this.scheduleError =
+    error.message || "Unable to schedule the match.";
+} finally {
+  this.scheduleSaving = false;
+}
+
+},
+
     async login() {
       this.errorMessage = "";
       this.loading = true;
@@ -1125,6 +1515,11 @@ async deleteRegistration(registration) {
 },
 
     logout() {
+      if (this.scheduledMatchesTimer) {
+        clearInterval(this.scheduledMatchesTimer);
+        this.scheduledMatchesTimer = null;
+      }
+
       this.token = "";
       this.password = "";
       this.username = "";
@@ -1417,7 +1812,7 @@ async deleteRegistration(registration) {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  padding: 22px;
+  padding: 30px 22px 22px;
   border-bottom: 1px solid #292c34;
 }
 
@@ -1430,6 +1825,139 @@ async deleteRegistration(registration) {
   margin: 0;
   color: #9296a0;
   font-size: 12px;
+}
+
+/* Schedule Matches Form */
+.schedule-matches-card {
+  margin-top: 24px;
+}
+
+.schedule-match-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px;
+}
+
+.schedule-match-form label {
+  display: block;
+  margin-top: 4px;
+  color: #d6d8df;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.schedule-match-form input,
+.schedule-match-form select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 1px solid #363a44;
+  border-radius: 8px;
+  outline: none;
+  background: #090b10;
+  color: #fff;
+  font-size: 13px;
+}
+
+.schedule-match-form input:focus,
+.schedule-match-form select:focus {
+  border-color: #d4ad54;
+}
+
+.schedule-team-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: end;
+  gap: 14px;
+}
+
+
+.schedule-date-time-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 1fr) auto;
+  align-items: end;
+  gap: 24px;
+  width: 100%;
+}
+
+.schedule-date-time-row > div {
+  min-width: 0;
+}
+
+.schedule-date-time-row .edit-scheduled-matches-btn {
+  justify-self: end;
+  grid-column: 3;
+  margin: 0;
+  white-space: nowrap;
+  width: fit-content;
+  align-self: end;
+}
+
+
+.schedule-date-time-row .schedule-date-field input {
+  width: 220px;
+  max-width: 100%;
+  grid-column: 1;
+}
+
+.schedule-date-time-row .schedule-time-field {
+  grid-column: 2;
+  justify-self: center;
+  width: 206px;
+  max-width: 100%;
+}
+
+.schedule-date-time-row .schedule-time-field input {
+  width: 100%;
+  box-sizing: border-box;
+}
+@media (max-width: 700px) {
+  .schedule-date-time-row {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .schedule-date-time-row .schedule-date-field,
+  .schedule-date-time-row .schedule-time-field,
+  .schedule-date-time-row .edit-scheduled-matches-btn {
+    grid-column: 1;
+    justify-self: stretch;
+    width: 100%;
+  }
+}
+
+.schedule-team-row > div {
+  min-width: 0;
+}
+
+.schedule-vs {
+  padding-bottom: 12px;
+  color: #f0ca6a;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.schedule-match-form .primary-btn {
+  width: 100%;
+  margin-top: 8px;
+}
+
+@media (max-width: 600px) {
+  .schedule-match-form {
+    padding: 16px;
+  }
+
+  .schedule-team-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .schedule-vs {
+    padding: 0;
+    text-align: center;
+  }
 }
 
 .search-input {
@@ -1860,6 +2388,28 @@ tbody tr:hover {
   border-bottom: 1px solid rgba(226, 181, 78, 0.15);
 }
 
+
+.mode-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  padding: 16px;
+}
+
+.mode-options .mode-row {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid rgba(226, 181, 78, 0.15);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.015);
+}
+
+@media (max-width: 640px) {
+  .mode-options {
+    grid-template-columns: 1fr;
+  }
+}
+
 .mode-row h3 {
   margin: 0;
   font-size: 15px;
@@ -1903,13 +2453,16 @@ tbody tr:hover {
   font-size: 13px;
 }
 
-
 .match-form {
   display: grid;
   grid-template-columns: 1fr;
   gap: 10px;
+  width: calc(100% - 40px);
   max-width: 520px;
+  margin: 20px auto;
+  box-sizing: border-box;
 }
+
 
 .match-form label {
   margin-top: 8px;
@@ -2161,6 +2714,7 @@ select option {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
   align-items: start;
+  margin-bottom: 20px;
 }
 
 .match-panels > .table-card {
@@ -2173,6 +2727,439 @@ select option {
   .match-panels {
     grid-template-columns: 1fr;
   }
+}
+
+.tournament-mode-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 640px) {
+  .tournament-mode-options {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+.tournament-settings {
+  margin-bottom: 18px;
+}
+
+.match-settings-card {
+  margin-top: 24px;
+}
+
+
+.match-settings-card {
+  margin-top: 24px;
+}
+
+.match-settings-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.match-settings-heading h2 {
+  margin: 0;
+}
+
+.match-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  padding: 24px 20px;
+}
+
+.match-setting-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid #302d26;
+  border-radius: 16px;
+  background: #12141a;
+}
+
+.match-setting-item h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.match-setting-item select {
+  width: 190px;
+  max-width: 55%;
+  flex-shrink: 0;
+}
+
+@media (max-width: 700px) {
+  .match-settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .match-setting-item {
+    flex-wrap: wrap;
+  }
+
+  .match-setting-item select {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
+.tie-breaker-card {
+  min-height: 0;
+  height: fit-content;
+  align-self: start;
+}
+
+.tie-breaker-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.tie-breaker-card .undo-match-btn {
+  margin-top: 0;
+}
+
+@media (max-width: 768px) {
+  .tie-breaker-card {
+    min-height: auto;
+  }
+}
+
+
+.schedule-match-form input[type="date"],
+.schedule-match-form input[type="time"] {
+  color-scheme: dark !important;
+  accent-color: #f0ca6a;
+  -webkit-appearance: auto;
+  appearance: auto;
+}
+
+.schedule-match-form input[type="date"]::-webkit-calendar-picker-indicator,
+.schedule-match-form input[type="time"]::-webkit-calendar-picker-indicator {
+  opacity: 1 !important;
+  filter: brightness(0) invert(1) !important;
+  cursor: pointer;
+}
+
+.schedule-group-assigned-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.50fr) minmax(0, 0.50fr);
+  gap: 18px;
+  align-items: end;
+}
+
+.schedule-group-assigned-row > div {
+  min-width: 0;
+}
+
+@media (max-width: 600px) {
+  .schedule-group-assigned-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+.edit-scheduled-matches-btn {
+  align-self: end;
+  min-height: 56px;
+  padding: 14px 24px;
+  border: 1px solid #e7bd55;
+  border-radius: 9px;
+  background: #17171e;
+  color: #f0ca6a;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+}
+
+.edit-scheduled-matches-btn:hover {
+  background: #f0ca6a;
+  color: #111;
+}
+
+
+/* Scheduled matches: full-screen modal backdrop */
+.scheduled-matches-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(3, 5, 10, 0.82);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Main modal card */
+.scheduled-matches-overlay .scheduled-matches-panel {
+  width: min(900px, 100%);
+  max-height: min(82vh, 760px);
+  overflow-y: auto;
+  padding: 28px;
+  background: #101116;
+  color: #f5f5f7;
+  border: 1px solid rgba(232, 187, 75, 0.35);
+  border-radius: 20px;
+  box-shadow: 0 24px 90px rgba(0, 0, 0, 0.55);
+}
+
+/* Header */
+.scheduled-matches-overlay .scheduled-matches-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid #292b34;
+}
+
+.scheduled-matches-title h3 {
+  margin: 8px 0;
+  font-size: 25px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.scheduled-matches-title p {
+  margin: 0;
+  color: #9699a6;
+  font-size: 14px;
+}
+
+.scheduled-matches-eyebrow {
+  color: #e9bd58;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 2px;
+}
+
+/* Close button */
+.scheduled-matches-overlay .close-scheduled-matches-btn {
+  flex-shrink: 0;
+  padding: 10px 15px;
+  border: 1px solid #41434d;
+  border-radius: 9px;
+  background: #191a21;
+  color: #f5f5f7;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.scheduled-matches-overlay .close-scheduled-matches-btn:hover {
+  border-color: #e9bd58;
+  color: #e9bd58;
+}
+
+/* Filters */
+.scheduled-matches-overlay .scheduled-match-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 22px 0;
+}
+
+.scheduled-matches-overlay .scheduled-match-filters button {
+  padding: 10px 16px;
+  border: 1px solid #30323b;
+  border-radius: 9px;
+  background: #17181f;
+  color: #b8bac4;
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.scheduled-matches-overlay .scheduled-match-filters button.active {
+  background: #e9bd58;
+  border-color: #e9bd58;
+  color: #15120a;
+}
+
+.scheduled-matches-overlay .scheduled-match-filters button:hover {
+  border-color: #e9bd58;
+}
+
+/* Match list */
+.scheduled-matches-overlay .scheduled-match-list {
+  display: grid;
+  gap: 14px;
+}
+
+.scheduled-matches-overlay .scheduled-match-item {
+  padding: 20px;
+  border: 1px solid #2b2d37;
+  border-radius: 13px;
+  background: linear-gradient(135deg, #191a22, #121319);
+  transition: border-color 0.2s ease,
+              transform 0.2s ease;
+}
+
+.scheduled-matches-overlay .scheduled-match-item:hover {
+  border-color: rgba(233, 189, 88, 0.65);
+  transform: translateY(-2px);
+}
+
+.scheduled-matches-overlay .scheduled-match-item h4 {
+  margin: 0 0 15px;
+  font-size: 17px;
+  line-height: 1.5;
+  color: #ffffff;
+}
+
+.scheduled-matches-overlay .scheduled-match-item p {
+  margin: 8px 0;
+  color: #a9abb7;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.scheduled-matches-overlay .scheduled-match-item p:last-of-type {
+  color: #e9bd58;
+}
+
+.scheduled-matches-overlay .edit-match-btn {
+  margin-top: 12px;
+  padding: 9px 20px;
+  border: 1px solid #e9bd58;
+  border-radius: 8px;
+  background: rgba(233, 189, 88, 0.08);
+  color: #e9bd58;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.scheduled-matches-overlay .edit-match-btn:hover {
+  background: #e9bd58;
+  color: #15120a;
+}
+
+/* Match action buttons */
+.scheduled-match-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.scheduled-matches-overlay .scheduled-match-actions .edit-match-btn,
+.scheduled-matches-overlay .scheduled-match-actions .delete-match-btn {
+  margin-top: 0;
+  min-width: 110px;
+  padding: 11px 20px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.scheduled-matches-overlay .scheduled-match-actions .delete-match-btn {
+  border: 1px solid #ef5350;
+  background: rgba(239, 83, 80, 0.09);
+  color: #ff6b68;
+}
+
+.scheduled-matches-overlay .scheduled-match-actions .delete-match-btn:hover {
+  background: #ef5350;
+  border-color: #ef5350;
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(239, 83, 80, 0.22);
+  transform: translateY(-2px);
+}
+
+.scheduled-matches-overlay .scheduled-match-actions .delete-match-btn:active {
+  transform: scale(0.97);
+}
+
+/* Empty state */
+.scheduled-matches-overlay .scheduled-match-empty {
+  padding: 40px 20px;
+  border: 1px dashed #363844;
+  border-radius: 12px;
+  color: #a9abb7;
+  text-align: center;
+}
+
+/* Small screens */
+@media (max-width: 600px) {
+  .scheduled-matches-overlay {
+    padding: 12px;
+  }
+
+  .scheduled-matches-overlay .scheduled-matches-panel {
+    padding: 18px;
+    max-height: 88vh;
+    border-radius: 15px;
+  }
+
+  .scheduled-matches-title h3 {
+    font-size: 20px;
+  }
+
+  .scheduled-matches-overlay .scheduled-match-item {
+    padding: 15px;
+  }
+}
+
+/* Cancel Edit Button */
+.cancel-edit-match-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  margin-top: 12px;
+  margin-bottom: 10px;
+
+  background: linear-gradient(135deg, #252525, #111111);
+  color: #f0c75e;
+
+  border: 1px solid #c99b32;
+  border-radius: 8px;
+
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.cancel-edit-match-btn:hover {
+  background: linear-gradient(135deg, #d8ad43, #f3d77c);
+  color: #111111;
+  border-color: #f3d77c;
+  box-shadow: 0 0 18px rgba(240, 199, 94, 0.3);
+  transform: translateY(-2px);
+}
+
+.cancel-edit-match-btn:active {
+  transform: scale(0.97);
+  box-shadow: none;
+}
+
+.cancel-edit-match-btn:focus-visible {
+  outline: 2px solid #f0c75e;
+  outline-offset: 3px;
 }
 
 </style>

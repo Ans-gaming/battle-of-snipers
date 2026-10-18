@@ -10,6 +10,7 @@ require("dotenv").config();
 const Registration = require("./registration");
 const TournamentSettings = require("./tournamentSettings");
 const MatchResults = require("./matchResults");
+const ScheduledMatch = require("./scheduledMatch");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -136,6 +137,54 @@ mongoose
     }
   });
   
+  
+app.post("/api/scheduled-matches/for-player", async (req, res) => {
+  try {
+    const { ffUid } = req.body || {};
+
+    if (typeof ffUid !== "string" || !/^[0-9]+$/.test(ffUid.trim())) {
+      return res.status(400).json({
+        message: "Please enter a valid numeric FF UID."
+      });
+    }
+
+    const settings = await TournamentSettings.findOne();
+
+    if (!settings || !settings.tournamentStarted) {
+      return res.status(403).json({
+        message: "Scheduled matches are available after the tournament starts."
+      });
+    }
+
+    const player = await Registration.findOne({
+      ffUid: ffUid.trim()
+    }).select("_id teamName");
+
+    if (!player) {
+      return res.status(404).json({
+        message: "This FF UID is not registered for Season 7."
+      });
+    }
+
+    const scheduledMatches = await ScheduledMatch.find({
+  $or: [
+    { team1Name: player.teamName },
+    { team2Name: player.teamName }
+  ]
+})
+  .sort({ matchDate: 1 })
+  .lean();
+
+    return res.json({ scheduledMatches });
+  } catch (error) {
+    console.error("Loading scheduled matches failed:", error.message);
+
+    return res.status(500).json({
+      message: "Could not load scheduled matches."
+    });
+  }
+});
+
   // PUBLIC: Register a team
   app.post("/api/register", upload.single("teamLogo"), async (req, res) => {
     try {
@@ -456,6 +505,264 @@ app.get("/api/admin/registrations", verifyAdmin, async (req, res) => {
     console.error("Loading registrations failed:", error.message);
     return res.status(500).json({
       message: "Could not load registrations."
+    });
+  }
+});
+
+ // ADMIN: Schedule a match
+app.post("/api/admin/scheduled-matches", verifyAdmin, async (req, res) => {
+  try {
+    const {
+      group,
+      team1Id,
+      team2Id,
+      matchDate,
+      assignedTo
+    } = req.body || {};
+
+    // Scheduling is allowed only before the tournament starts.
+    const settings = await TournamentSettings.findOne();
+
+    if (
+      !settings ||
+      settings.registrationOpen ||
+      settings.tournamentStarted
+    ) {
+      return res.status(403).json({
+        message:
+          "Scheduling is allowed only when registration is closed and the tournament has not started."
+      });
+    }
+
+    if (!["A", "B"].includes(group)) {
+      return res.status(400).json({
+        message: "Select a valid group."
+      });
+    }
+
+    if (
+      !mongoose.isValidObjectId(team1Id) ||
+      !mongoose.isValidObjectId(team2Id)
+    ) {
+      return res.status(400).json({
+        message: "Select two valid teams."
+      });
+    }
+
+    if (team1Id === team2Id) {
+      return res.status(400).json({
+        message: "A team cannot play against itself."
+      });
+    }
+
+    if (!assignedTo || !assignedTo.trim()) {
+      return res.status(400).json({
+        message: "Assigned To is required."
+      });
+    }
+
+    const scheduledDate = new Date(matchDate);
+
+    if (
+      !matchDate ||
+      Number.isNaN(scheduledDate.getTime()) ||
+      scheduledDate <= new Date()
+    ) {
+      return res.status(400).json({
+        message: "Select a valid future match date and time."
+      });
+    }
+
+    // Both teams must belong to the selected group.
+    const teams = await Registration.find({
+      _id: { $in: [team1Id, team2Id] },
+      group
+    }).select("_id teamName group");
+
+    if (teams.length !== 2) {
+      return res.status(400).json({
+        message:
+          "Both teams must be assigned to the selected group."
+      });
+    }
+
+    const team1 = teams.find(
+      team => team._id.toString() === team1Id
+    );
+
+    const team2 = teams.find(
+      team => team._id.toString() === team2Id
+    );
+
+    const scheduledMatch = await ScheduledMatch.create({
+      group,
+      team1Id: team1._id,
+      team1Name: team1.teamName,
+      team2Id: team2._id,
+      team2Name: team2.teamName,
+      matchDate: scheduledDate,
+      assignedTo: assignedTo.trim()
+    });
+
+    return res.status(201).json({
+      message: "Match scheduled successfully.",
+      scheduledMatch
+    });
+  } catch (error) {
+    console.error("Scheduling match failed:", error.message);
+
+    return res.status(500).json({
+      message: "Could not schedule the match."
+    });
+  }
+});
+
+ // ADMIN: Get all scheduled matches
+app.get("/api/admin/scheduled-matches", verifyAdmin, async (req, res) => {
+  try {
+    const scheduledMatches = await ScheduledMatch.find({})
+      .sort({ matchDate: 1 })
+      .lean();
+
+    return res.set("Cache-Control", "no-store").json({
+      scheduledMatches
+    });
+  } catch (error) {
+    console.error("Loading admin scheduled matches failed:", error.message);
+
+    return res.status(500).json({
+      message: "Could not load scheduled matches."
+    });
+  }
+});
+
+// ADMIN: Delete any scheduled match, upcoming or completed
+app.delete("/api/admin/scheduled-matches/:id", verifyAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({
+        message: "Invalid match ID."
+      });
+    }
+
+    const deletedMatch = await ScheduledMatch.findByIdAndDelete(id);
+
+    if (!deletedMatch) {
+      return res.status(404).json({
+        message: "Scheduled match not found."
+      });
+    }
+
+    return res.status(200).json({
+      message: "Scheduled match deleted successfully."
+    });
+  } catch (error) {
+    console.error("Deleting scheduled match failed:", error.message);
+
+    return res.status(500).json({
+      message: "Could not delete the scheduled match."
+    });
+  }
+});
+
+// ADMIN: Update an upcoming scheduled match
+app.put("/api/admin/scheduled-matches/:id", verifyAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { group, team1Id, team2Id, matchDate, assignedTo } = req.body || {};
+
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ message: "Invalid match ID." });
+    }
+
+    const scheduledMatch = await ScheduledMatch.findById(id);
+
+    if (!scheduledMatch) {
+      return res.status(404).json({ message: "Scheduled match not found." });
+    }
+
+    // Never allow editing a match whose scheduled date and time has passed.
+    if (new Date(scheduledMatch.matchDate).getTime() <= Date.now()) {
+      return res.status(403).json({
+        message: "Completed matches cannot be edited."
+      });
+    }
+
+    if (!["A", "B"].includes(group)) {
+      return res.status(400).json({ message: "Select a valid group." });
+    }
+
+    if (
+      !mongoose.isValidObjectId(team1Id) ||
+      !mongoose.isValidObjectId(team2Id)
+    ) {
+      return res.status(400).json({ message: "Select two valid teams." });
+    }
+
+    if (team1Id === team2Id) {
+      return res.status(400).json({
+        message: "A team cannot play against itself."
+      });
+    }
+
+    if (!assignedTo || !assignedTo.trim()) {
+      return res.status(400).json({
+        message: "Assigned To is required."
+      });
+    }
+
+    const scheduledDate = new Date(matchDate);
+
+    if (
+      !matchDate ||
+      Number.isNaN(scheduledDate.getTime()) ||
+      scheduledDate.getTime() <= Date.now()
+    ) {
+      return res.status(400).json({
+        message: "Select a valid future match date and time."
+      });
+    }
+
+    const teams = await Registration.find({
+      _id: { $in: [team1Id, team2Id] },
+      group
+    }).select("_id teamName group");
+
+    if (teams.length !== 2) {
+      return res.status(400).json({
+        message: "Both teams must belong to the selected group."
+      });
+    }
+
+    const team1 = teams.find(
+      team => team._id.toString() === team1Id
+    );
+
+    const team2 = teams.find(
+      team => team._id.toString() === team2Id
+    );
+
+    scheduledMatch.group = group;
+    scheduledMatch.team1Id = team1._id;
+    scheduledMatch.team1Name = team1.teamName;
+    scheduledMatch.team2Id = team2._id;
+    scheduledMatch.team2Name = team2.teamName;
+    scheduledMatch.matchDate = scheduledDate;
+    scheduledMatch.assignedTo = assignedTo.trim();
+
+    await scheduledMatch.save();
+
+    return res.json({
+      message: "Scheduled match updated successfully.",
+      scheduledMatch
+    });
+  } catch (error) {
+    console.error("Updating scheduled match failed:", error.message);
+
+    return res.status(500).json({
+      message: "Could not update the scheduled match."
     });
   }
 });
