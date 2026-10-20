@@ -11,6 +11,7 @@ const Registration = require("./registration");
 const TournamentSettings = require("./tournamentSettings");
 const MatchResults = require("./matchResults");
 const ScheduledMatch = require("./scheduledMatch");
+const Season = require("./season");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -838,6 +839,56 @@ app.get("/api/standings/teams", async (req, res) => {
     
     return res.status(500).json({
       message: "Could not load standings teams."
+    });
+  }
+});
+
+// PUBLIC: Get all historical seasons
+app.get("/api/seasons", async (req, res) => {
+  try {
+    res.set("Cache-Control", "no-store");
+
+    const seasons = await Season.find({
+      status: "Completed"
+    })
+    .select("seasonNumber title status")
+    .sort({ seasonNumber: -1 })
+    .lean();
+
+    return res.json({ seasons });
+  } catch (error) {
+    console.error("Loading seasons failed:", error.message);
+    return res.status(500).json({
+      message: "Could not load seasons."
+    });
+  }
+});
+
+// PUBLIC: Get one season and its standings/matches
+app.get("/api/seasons/:seasonNumber", async (req, res) => {
+  try {
+    const seasonNumber = Number(req.params.seasonNumber);
+
+    if (!Number.isInteger(seasonNumber) || seasonNumber < 1) {
+      return res.status(400).json({
+        message: "Invalid season number."
+      });
+    }
+
+    const season = await Season.findOne({ seasonNumber }).lean();
+
+    if (!season) {
+      return res.status(404).json({
+        message: "Season not found."
+      });
+    }
+
+    res.set("Cache-Control", "no-store");
+    return res.json({ season });
+  } catch (error) {
+    console.error("Loading season failed:", error.message);
+    return res.status(500).json({
+      message: "Could not load season."
     });
   }
 });
