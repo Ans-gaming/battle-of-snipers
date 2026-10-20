@@ -783,7 +783,7 @@ async saveScheduledMatchEdits() {
 
   try {
     const response = await fetch(
-      `http://localhost:5000/api/admin/scheduled-matches/${this.editingScheduledMatchId}`,
+      `https://battle-of-snipers.onrender.com/api/admin/scheduled-matches/${this.editingScheduledMatchId}`,
       {
         method: "PUT",
         headers: {
@@ -833,7 +833,7 @@ async deleteScheduledMatch(match) {
 
   try {
     const response = await fetch(
-      `http://localhost:5000/api/admin/scheduled-matches/${match._id}`,
+      `https://battle-of-snipers.onrender.com/api/admin/scheduled-matches/${match._id}`,
       {
         method: "DELETE",
         headers: {
@@ -867,7 +867,7 @@ async deleteScheduledMatch(match) {
     async loadScheduledMatches() {
   try {
     const response = await fetch(
-      "http://localhost:5000/api/admin/scheduled-matches",
+      "https://battle-of-snipers.onrender.com/api/admin/scheduled-matches",
       {
         method: "GET",
         headers: {
@@ -946,7 +946,7 @@ this.scheduleSaving = true;
 
 try {
   const response = await fetch(
-    "http://localhost:5000/api/admin/scheduled-matches",
+    "https://battle-of-snipers.onrender.com/api/admin/scheduled-matches",
     {
       method: "POST",
       headers: {
@@ -996,7 +996,7 @@ try {
 
       try {
         const response = await fetch(
-          "http://localhost:5000/api/admin/login",
+          "https://battle-of-snipers.onrender.com/api/admin/login",
           {
             method: "POST",
             headers: {
@@ -1035,7 +1035,7 @@ try {
 
       try {
         const response = await fetch(
-          "http://localhost:5000/api/admin/registrations",
+          "https://battle-of-snipers.onrender.com/api/admin/registrations",
           {
             headers: {
               Authorization: "Bearer " + this.token
@@ -1073,7 +1073,7 @@ async loadTournamentMode() {
 
   try {
     const response = await fetch(
-      "http://localhost:5000/api/tournament-mode"
+      "https://battle-of-snipers.onrender.com/api/tournament-mode"
     );
 
     const data = await response.json();
@@ -1123,7 +1123,7 @@ async setTournamentMode(mode) {
 
   try {
     const response = await fetch(
-      "http://localhost:5000/api/admin/tournament-mode",
+      "https://battle-of-snipers.onrender.com/api/admin/tournament-mode",
       {
         method: "PUT",
         headers: {
@@ -1190,7 +1190,7 @@ if (
 
   try {
     const response = await fetch(
-      "http://localhost:5000/api/admin/tournament-mode",
+      "https://battle-of-snipers.onrender.com/api/admin/tournament-mode",
       {
         method: "PUT",
         headers: {
@@ -1253,7 +1253,7 @@ async saveTeamGroup(registration, selectedGroup) {
 
   try {
     const response = await fetch(
-      `http://localhost:5000/api/admin/registrations/${encodeURIComponent(registration._id)}/group`,
+      `https://battle-of-snipers.onrender.com/api/admin/registrations/${encodeURIComponent(registration._id)}/group`,
       {
         method: "PUT",
         headers: {
@@ -1324,7 +1324,7 @@ async saveMatch() {
 
   try {
     const response = await fetch(
-      "http://localhost:5000/api/admin/standings/match",
+      "https://battle-of-snipers.onrender.com/api/admin/standings/match",
       {
         method: "POST",
         headers: {
@@ -1389,7 +1389,7 @@ async saveTieBreaker() {
 
   try {
     const response = await fetch(
-      "http://localhost:5000/api/admin/standings/tie-breaker",
+      "https://battle-of-snipers.onrender.com/api/admin/standings/tie-breaker",
       {
         method: "POST",
         headers: {
@@ -1439,7 +1439,7 @@ async undoLastMatch() {
 
   try {
     const response = await fetch(
-      `http://localhost:5000/api/admin/standings/${this.matchGroup}/undo`,
+      `https://battle-of-snipers.onrender.com/api/admin/standings/${this.matchGroup}/undo`,
       {
         method: "POST",
         headers: {
@@ -1480,7 +1480,7 @@ async deleteRegistration(registration) {
 
   try {
     const response = await fetch(
-      `http://localhost:5000/api/admin/registrations/${encodeURIComponent(registration._id)}`,
+      `https://battle-of-snipers.onrender.com/api/admin/registrations/${encodeURIComponent(registration._id)}`,
       {
         method: "DELETE",
         headers: {

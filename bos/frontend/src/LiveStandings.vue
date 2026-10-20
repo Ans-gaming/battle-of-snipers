@@ -309,7 +309,7 @@
 </template>
 
 <script>
-const API_BASE_URL = "http://localhost:5000";
+const API_BASE_URL = "https://battle-of-snipers.onrender.com";
 export default {
   name: "LiveStandings",
 
@@ -362,7 +362,7 @@ export default {
       
       try {
         const response = await fetch(
-          "http://localhost:5000/api/standings/teams",
+          "https://battle-of-snipers.onrender.com/api/standings/teams",
           {
             cache: "no-store"
           }
@@ -392,7 +392,7 @@ export default {
       
       try {
         const response = await fetch(
-          "http://localhost:5000/api/standings/points",
+          "https://battle-of-snipers.onrender.com/api/standings/points",
           { cache: "no-store" }
         );
         
@@ -422,7 +422,7 @@ async loadScheduledMatches() {
 
   try {
     const response = await fetch(
-      "http://localhost:5000/api/scheduled-matches/for-player",
+      "https://battle-of-snipers.onrender.com/api/scheduled-matches/for-player",
       {
         method: "POST",
         headers: {
@@ -549,7 +549,7 @@ backToSeasonDetails() {
 
       try {
         const response = await fetch(
-          "http://localhost:5000/api/verify-ff-uid",
+          "https://battle-of-snipers.onrender.com/api/verify-ff-uid",
           {
             method: "POST",
             headers: {
